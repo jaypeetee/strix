@@ -74,19 +74,13 @@
         return originalXHROpen.apply(this, [method, url, ...args]);
       };
 
-      // Override window.location navigation attempts
-      const originalLocationHref = Object.getOwnPropertyDescriptor(Location.prototype, 'href');
-      Object.defineProperty(window.location, 'href', {
-        set: function(url) {
-          if (url.includes('strix.ai') || url.includes('app.strix.ai')) {
-            const runParam = new URLSearchParams(window.location.search).get('run');
-            originalLocationHref.set.call(this, '/jira-sync' + (runParam ? '?run=' + runParam : ''));
-          } else {
-            originalLocationHref.set.call(this, url);
-          }
-        },
-        get: originalLocationHref.get
-      });
+      // Watch for any element that might be a link to strix.ai
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('a[href*="strix.ai"], button');
+        if (target) {
+          console.log('[Strix] Click detected on:', target.tagName, target.href || target.textContent);
+        }
+      }, true);
 
       // Hide/disable email export UI
       setTimeout(() => {
