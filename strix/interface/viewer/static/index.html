@@ -82,14 +82,16 @@
         // Define action functions
       window.exportMarkdown = async function() {
         try {
-          const res = await fetch('/api/report/markdown');
+          const res = await fetch('/api/report');
           const data = await res.json();
           if (data.markdown) {
             const blob = new Blob([data.markdown], {type: 'text/markdown'});
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = data.filename || 'strix-report.md';
+            const run = new URLSearchParams(window.location.search).get('run');
+            const timestamp = new Date().toISOString().split('T')[0];
+            a.download = `strix-report-${run || 'export'}-${timestamp}.md`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
