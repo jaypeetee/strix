@@ -256,10 +256,6 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._handle_auth_status()
                 return
 
-            if path == "/jira-sync":
-                self._handle_jira_sync_form()
-                return
-
             # Redirect old strix.ai links to local Jira sync form
             if path.startswith("/integrations") or path == "/autofix":
                 self.send_response(HTTPStatus.FOUND)
@@ -705,6 +701,11 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
             return bool(supplied) and secrets.compare_digest(supplied, state.session_token)
 
         def _handle_static(self, path: str, query: dict[str, list[str]]) -> None:
+            # Handle special routes before falling back to assets
+            if path == "/jira-sync":
+                self._handle_jira_sync_form()
+                return
+
             target = self._resolve_asset(path)
             if target is None:
                 # SPA fallback: unknown non-asset routes render index.html so
