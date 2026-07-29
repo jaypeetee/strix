@@ -119,15 +119,25 @@
           display: flex;
           gap: 8px;
         `;
+
         const exportBtn = document.createElement('button');
         exportBtn.textContent = 'Export .md';
         exportBtn.style.cssText = 'padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
-        exportBtn.onclick = window.exportMarkdown;
+        exportBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.exportMarkdown();
+        }, true);
 
         const jiraBtn = document.createElement('button');
         jiraBtn.textContent = 'Sync to Jira';
         jiraBtn.style.cssText = 'padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
-        jiraBtn.onclick = window.syncToJira;
+        jiraBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const run = new URLSearchParams(window.location.search).get('run');
+          window.location.href = '/jira-sync' + (run ? '?run=' + run : '');
+        }, true);
 
         actionsDiv.appendChild(exportBtn);
         actionsDiv.appendChild(jiraBtn);
