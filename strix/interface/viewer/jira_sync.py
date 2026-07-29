@@ -37,34 +37,25 @@ class JiraClient:
         issue_type: str = "Bug",
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Create an issue in Jira.
+        """Create an issue in Jira using v2 API (more stable).
 
         Args:
             project_key: Project key (e.g., "SEC")
             title: Issue title/summary
-            description: Issue description (can include markdown)
+            description: Issue description (plain text)
             issue_type: Issue type (Bug, Task, etc.)
             **kwargs: Additional fields (labels, priority, etc.)
 
         Returns:
             Response with created issue key and ID.
         """
-        url = f"{self.instance_url}/rest/api/3/issues"
+        url = f"{self.instance_url}/rest/api/2/issue"
 
         payload = {
             "fields": {
                 "project": {"key": project_key},
                 "summary": title,
-                "description": {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [
-                        {
-                            "type": "paragraph",
-                            "content": [{"type": "text", "text": description}],
-                        }
-                    ],
-                },
+                "description": description,
                 "issuetype": {"name": issue_type},
             }
         }
