@@ -12,13 +12,43 @@
   <body>
     <div id="root"></div>
     <script>
+      console.log('[Strix] Loading interception scripts');
+
+      // Intercept all navigation to strix.ai
+      const originalAssign = window.location.assign;
+      const originalReplace = window.location.replace;
+
+      window.location.assign = function(url) {
+        console.log('[Strix] location.assign called with:', url);
+        if (typeof url === 'string' && url.includes('strix.ai')) {
+          console.log('[Strix] Blocking redirect to strix.ai, going to /jira-sync instead');
+          const runParam = new URLSearchParams(window.location.search).get('run');
+          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+          return;
+        }
+        return originalAssign.apply(window.location, [url]);
+      };
+
+      window.location.replace = function(url) {
+        console.log('[Strix] location.replace called with:', url);
+        if (typeof url === 'string' && url.includes('strix.ai')) {
+          console.log('[Strix] Blocking redirect to strix.ai, going to /jira-sync instead');
+          const runParam = new URLSearchParams(window.location.search).get('run');
+          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+          return;
+        }
+        return originalReplace.apply(window.location, [url]);
+      };
+
       // Intercept fetch calls before React attaches handlers
       const originalFetch = window.fetch;
       window.fetch = function(...args) {
         const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : '');
+        console.log('[Strix] fetch called:', url);
 
         // Intercept Jira sync requests
         if (url.includes('/api/jira/sync')) {
+          console.log('[Strix] Intercepting jira sync, redirecting to form');
           const runParam = new URLSearchParams(window.location.search).get('run');
           window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
           return Promise.reject(new Error('redirecting'));
@@ -26,6 +56,7 @@
 
         // Block email report send and redirect
         if (url.includes('/api/report/send')) {
+          console.log('[Strix] Intercepting report send');
           const runParam = new URLSearchParams(window.location.search).get('run');
           window.location.href = '/?tab=forecast' + (runParam ? '&run=' + runParam : '');
           return Promise.reject(new Error('redirecting'));
