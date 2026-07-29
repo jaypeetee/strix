@@ -17,6 +17,13 @@ body {
   background: #000000;
   color: #ffffff;
   font-family: var(--font-geist-sans);
+  transition: background-color 200ms, color 200ms;
+}
+
+html.light,
+html.light body {
+  background: #f8f8f8;
+  color: #1a1a1a;
 }
 
 /* Thin sidebar scrollbar */
@@ -34,6 +41,13 @@ body {
 }
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
+}
+
+html.light .scrollbar-thin {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+html.light .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
 }
 
 /* Motion vocabulary --------------------- */

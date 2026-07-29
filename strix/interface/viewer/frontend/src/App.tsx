@@ -9,7 +9,10 @@ import {
   Rocket,
   ArrowUpRight,
   History,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import type { Vulnerability, VulnerabilitySeverity } from "@/types/issues";
 import { SEVERITY_COLORS } from "@/types/issues";
 import { getSeverityDot } from "@/lib/vulnerability-utils";
@@ -53,6 +56,7 @@ const SEVERITY_ORDER: VulnerabilitySeverity[] = ["critical", "high", "medium", "
 const POLL_MS = 500;
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme();
   const [activeRun, setActiveRun] = useState<string | null>(null);
   const [run, setRun] = useState<LoadedRun | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -238,7 +242,7 @@ export default function App() {
   }, [refreshAuth, refreshRuns]);
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen dark:bg-black dark:text-white bg-gray-50 text-gray-900 flex">
       <Sidebar
         view={view}
         onSelectView={(v) => {
@@ -262,7 +266,7 @@ export default function App() {
 
       <div className="flex-1 min-w-0">
         {/* Top bar */}
-        <div className="border-b border-[#222]">
+        <div className="dark:border-[#222] border-gray-200 border-b">
           <div className="max-w-[88rem] mx-auto px-3 sm:px-6 py-4 flex items-center gap-1.5">
             <a
               href={ctaUrl("https://app.strix.ai", "logo")}
@@ -277,6 +281,17 @@ export default function App() {
             </a>
             {run && <LiveIndicator finished={run.finished} />}
             <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg dark:hover:bg-[#1a1a1a] hover:bg-gray-200 transition-colors"
+                title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              >
+                {theme === "dark" ? (
+                  <Sun className="w-5 h-5 text-yellow-400" />
+                ) : (
+                  <Moon className="w-5 h-5 dark:text-gray-400 text-gray-600" />
+                )}
+              </button>
               {verified && runs && !runs.locked && runs.runs.length > 0 && (
                 <RunSwitcher
                   runs={runs}

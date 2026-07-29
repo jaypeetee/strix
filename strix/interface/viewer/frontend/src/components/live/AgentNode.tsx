@@ -18,8 +18,8 @@ function AgentNodeComponent({ data, selected }: NodeProps) {
     <div
       className={`w-[260px] rounded-lg border px-4 py-3 transition-colors ${
         agent.isSelected || selected
-          ? "border-white/30 bg-[#0a0a0a]"
-          : "border-[#222] bg-black hover:border-[#333]"
+          ? "dark:border-white/30 dark:bg-[#0a0a0a] border-gray-300 bg-white"
+          : "dark:border-[#222] dark:bg-black dark:hover:border-[#333] border-gray-200 bg-white hover:border-gray-300"
       }`}
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className={`!w-1.5 !h-1.5 !border-0 ${agent.parentId ? "!bg-[#444]" : "!bg-transparent"}`} />
@@ -35,7 +35,7 @@ function AgentNodeComponent({ data, selected }: NodeProps) {
             className={`relative inline-flex h-2 w-2 rounded-full ${STATUS_STYLES[agent.status] ?? "bg-gray-500"}`}
           />
         </span>
-        <span className="text-sm font-semibold text-white leading-snug line-clamp-3">
+        <span className="text-sm font-semibold dark:text-white text-gray-900 leading-snug line-clamp-3">
           {agent.name}
         </span>
       </div>
