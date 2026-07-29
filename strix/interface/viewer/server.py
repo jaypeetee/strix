@@ -373,10 +373,6 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
             if not self._has_session():
                 self._send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
                 return
-            record = auth.read_auth()
-            if record is None:
-                self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "unverified"})
-                return
             run_param = str(self._read_body().get("run") or "") or None
             run_dir = resolve_run_dir(state.base_dir, run_param, state.run_dir)
             if run_dir is None:
@@ -384,29 +380,18 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 return
 
             summary = read_run_summary(run_dir)
-            # Emailing only makes sense for a completed run; a live scan would
-            # send a partial report. The UI hides the entry point, but fail
-            # closed here too so the endpoint can't be driven mid-scan.
             if not summary.get("finished", False):
                 self._send_json(HTTPStatus.CONFLICT, {"error": "run_not_finished"})
                 return
 
-            from strix.interface.viewer.report_pdf import build_encrypted_report
-
-            pdf_bytes, password, filename = build_encrypted_report(run_dir)
+            markdown = read_report_markdown(run_dir)
             run_name = str(summary.get("run_name") or run_dir.name)
-            target = primary_target(summary) or "unknown target"
-            try:
-                # The password is intentionally NOT passed here; only the
-                # encrypted PDF bytes reach the relay.
-                auth.report_send(record["token"], pdf_bytes, filename, run_name, target)
-            except auth.RelayError as exc:
-                self._send_relay_error(exc)
-                return
-            # The password is returned only to the local (127.0.0.1) browser.
+            timestamp = datetime.now().strftime("%Y-%m-%d")
+            filename = f"strix-report-{run_name}-{timestamp}.md"
+
             self._send_json(
                 HTTPStatus.OK,
-                {"ok": True, "password": password, "filename": filename},
+                {"ok": True, "markdown": markdown, "filename": filename},
             )
 
         # Cap on a feedback message so a runaway client cannot flood the relay.

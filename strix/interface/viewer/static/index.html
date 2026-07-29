@@ -23,11 +23,51 @@
         }
       }, true);
 
+      // Intercept export button to download markdown locally instead of emailing
+      document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('button');
+        if (btn && (btn.textContent.includes('EMail') || btn.textContent.includes('PDF') || btn.textContent.includes('Export'))) {
+          // Check if this is the export button by looking for fetch calls in the click handler
+          const originalFetch = window.fetch;
+          let interceptedCall = null;
+
+          window.fetch = function(...args) {
+            const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+            if (url && url.includes('/api/report/send')) {
+              interceptedCall = { url, args };
+              e.preventDefault();
+              e.stopPropagation();
+
+              // Make the request ourselves
+              return originalFetch.apply(this, args).then(async response => {
+                const data = await response.clone().json();
+                if (data.ok && data.markdown && data.filename) {
+                  // Download markdown file
+                  const blob = new Blob([data.markdown], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = data.filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }
+                return response;
+              });
+            }
+            return originalFetch.apply(this, args);
+          };
+          window.fetch.toString = function() { return 'function fetch() { [native code] }'; };
+        }
+      }, true);
+
       // Rename email/PDF button to markdown export
       const observer = new MutationObserver(() => {
         document.querySelectorAll('button').forEach(btn => {
-          if (btn.textContent.includes('EMail') || btn.textContent.includes('PDF')) {
+          if ((btn.textContent.includes('EMail') || btn.textContent.includes('PDF')) && !btn.dataset.renamed) {
             btn.textContent = 'Export report to .md';
+            btn.dataset.renamed = 'true';
           }
         });
       });
