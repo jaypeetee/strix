@@ -370,29 +370,8 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
             self._send_json(HTTPStatus.OK, {"ok": True})
 
         def _handle_report_send(self) -> None:
-            if not self._has_session():
-                self._send_json(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
-                return
-            run_param = str(self._read_body().get("run") or "") or None
-            run_dir = resolve_run_dir(state.base_dir, run_param, state.run_dir)
-            if run_dir is None:
-                self._send_json(HTTPStatus.NOT_FOUND, {"error": "unknown run"})
-                return
-
-            summary = read_run_summary(run_dir)
-            if not summary.get("finished", False):
-                self._send_json(HTTPStatus.CONFLICT, {"error": "run_not_finished"})
-                return
-
-            markdown = read_report_markdown(run_dir)
-            run_name = str(summary.get("run_name") or run_dir.name)
-            timestamp = datetime.now().strftime("%Y-%m-%d")
-            filename = f"strix-report-{run_name}-{timestamp}.md"
-
-            self._send_json(
-                HTTPStatus.OK,
-                {"ok": True, "markdown": markdown, "filename": filename},
-            )
+            # Email report sending is disabled. Use the export button instead.
+            self._send_json(HTTPStatus.GONE, {"error": "email export disabled"})
 
         # Cap on a feedback message so a runaway client cannot flood the relay.
         _FEEDBACK_MESSAGE_MAX = 5000

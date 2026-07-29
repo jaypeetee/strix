@@ -23,44 +23,28 @@
         }
       }, true);
 
-      // Intercept export button to download markdown locally instead of emailing
-      document.addEventListener('click', async function(e) {
-        const btn = e.target.closest('button');
-        if (btn && (btn.textContent.includes('EMail') || btn.textContent.includes('PDF') || btn.textContent.includes('Export'))) {
-          // Check if this is the export button by looking for fetch calls in the click handler
-          const originalFetch = window.fetch;
-          let interceptedCall = null;
+      // Hide the old email export view and show a message
+      const hideEmailExportView = () => {
+        const emailExportElements = document.querySelectorAll('[class*="EmailReportView"], [class*="PDF"], [class*="password"]');
+        emailExportElements.forEach(el => {
+          if (el.textContent && (el.textContent.includes('EMail') || el.textContent.includes('PDF') || el.textContent.includes('password'))) {
+            el.style.display = 'none';
+          }
+        });
 
-          window.fetch = function(...args) {
-            const url = typeof args[0] === 'string' ? args[0] : args[0].url;
-            if (url && url.includes('/api/report/send')) {
-              interceptedCall = { url, args };
-              e.preventDefault();
-              e.stopPropagation();
+        // Also hide by looking for text content
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+          if (el.textContent && el.textContent.includes('Sent to') && el.textContent.includes('@')) {
+            el.closest('[class*="View"], [class*="Card"], [class*="Container"]')?.style.display = 'none';
+          }
+        });
+      };
 
-              // Make the request ourselves
-              return originalFetch.apply(this, args).then(async response => {
-                const data = await response.clone().json();
-                if (data.ok && data.markdown && data.filename) {
-                  // Download markdown file
-                  const blob = new Blob([data.markdown], { type: 'text/markdown' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = data.filename;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }
-                return response;
-              });
-            }
-            return originalFetch.apply(this, args);
-          };
-          window.fetch.toString = function() { return 'function fetch() { [native code] }'; };
-        }
-      }, true);
+      // Run on load and watch for changes
+      hideEmailExportView();
+      const observer = new MutationObserver(hideEmailExportView);
+      observer.observe(document.body, { childList: true, subtree: true });
 
       // Rename email/PDF button to markdown export
       const observer = new MutationObserver(() => {
