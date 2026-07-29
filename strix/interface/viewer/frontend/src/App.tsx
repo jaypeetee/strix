@@ -41,7 +41,7 @@ import { SIGNUP_URL, ctaUrl, trackCta } from "@/lib/cta";
 import { runTitle } from "@/lib/target-utils";
 import Sidebar from "@/components/Sidebar";
 import PastRunsView from "@/components/PastRunsView";
-import EmailReportView from "@/components/EmailReportView";
+import MarkdownExportView from "@/components/MarkdownExportView";
 import { RunDetails } from "@/components/RunDetails";
 import { TrustToast } from "@/components/TrustToast";
 import FeedbackView from "@/components/FeedbackView";
@@ -329,16 +329,9 @@ export default function App() {
             className="animate-page-in space-y-6"
           >
           {view === "email" ? (
-            <EmailReportView
+            <MarkdownExportView
               activeRun={activeRun}
-              auth={auth}
-              purpose={emailPurpose}
-              skipDisclosure={emailSkipDisclosure}
-              onAuthChanged={() => {
-                void refreshAuth();
-                void refreshRuns();
-              }}
-              onExit={(dest) => setView(dest === "history" ? "history" : "overview")}
+              onExit={() => setView("overview")}
             />
           ) : view === "feedback" ? (
             <FeedbackView
@@ -621,7 +614,7 @@ function dedupeHeadings(md: string): string {
   return out.join("\n");
 }
 
-/** Primary local CTA: email an encrypted PDF. Verify-email affordance, no lock. */
+/** Local export: download report as markdown. No cloud upload, no encryption. */
 function EmailReportCta({ onOpenEmail }: { onOpenEmail: () => void }) {
   return (
     <button
@@ -636,9 +629,9 @@ function EmailReportCta({ onOpenEmail }: { onOpenEmail: () => void }) {
           <Mail className="h-4 w-4 text-emerald-400" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-white">Email an encrypted PDF report of this run</p>
+          <p className="text-sm font-semibold text-white">Export report as markdown</p>
           <p className="mt-0.5 text-xs text-[#888]">
-            Encrypted with a key only you can see, email verified with a one-time code before sending.
+            Download your findings as a local markdown file. No cloud upload required.
           </p>
         </div>
         <span className="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black transition-opacity group-hover:opacity-90">
