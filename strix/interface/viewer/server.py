@@ -256,6 +256,10 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._handle_auth_status()
                 return
 
+            if path == "/jira-sync":
+                self._handle_jira_sync_form()
+                return
+
             run_values = query.get("run")
             run_param = run_values[0] if run_values else None
             run_dir = resolve_run_dir(state.base_dir, run_param, state.run_dir)
@@ -454,6 +458,184 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.OK, {"ok": True})
             else:
                 self._send_json(HTTPStatus.OK, {"ok": False, "error": "not_delivered"})
+
+        def _handle_jira_sync_form(self) -> None:
+            """Serve an HTML form for Jira sync from the GUI."""
+            html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Sync to Jira</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                        background: #f8f8f8;
+                        padding: 40px 20px;
+                        margin: 0;
+                    }
+                    .container {
+                        max-width: 500px;
+                        margin: 0 auto;
+                        background: white;
+                        padding: 30px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    }
+                    h1 {
+                        margin-top: 0;
+                        color: #333;
+                        font-size: 24px;
+                    }
+                    .form-group {
+                        margin-bottom: 20px;
+                    }
+                    label {
+                        display: block;
+                        margin-bottom: 8px;
+                        font-weight: 500;
+                        color: #333;
+                        font-size: 14px;
+                    }
+                    input, select {
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        font-size: 14px;
+                        box-sizing: border-box;
+                    }
+                    input:focus, select:focus {
+                        outline: none;
+                        border-color: #0066cc;
+                        box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+                    }
+                    .help-text {
+                        font-size: 12px;
+                        color: #666;
+                        margin-top: 4px;
+                    }
+                    button {
+                        width: 100%;
+                        padding: 12px;
+                        background: white;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        margin-top: 20px;
+                    }
+                    button:hover {
+                        background: #f8f8f8;
+                    }
+                    .loading {
+                        display: none;
+                        text-align: center;
+                        color: #666;
+                        margin-top: 20px;
+                    }
+                    .error {
+                        background: #fee;
+                        color: #c00;
+                        padding: 12px;
+                        border-radius: 4px;
+                        margin-bottom: 20px;
+                        display: none;
+                    }
+                    .success {
+                        background: #efe;
+                        color: #060;
+                        padding: 12px;
+                        border-radius: 4px;
+                        margin-bottom: 20px;
+                        display: none;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Sync Findings to Jira</h1>
+                    <div class="error" id="error"></div>
+                    <div class="success" id="success"></div>
+                    <form id="form">
+                        <div class="form-group">
+                            <label>Jira Instance URL</label>
+                            <input type="url" name="jira_url" placeholder="https://company.atlassian.net" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" placeholder="your@email.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>API Token</label>
+                            <input type="password" name="token" placeholder="Your Jira API token" required>
+                            <div class="help-text">Get it from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">id.atlassian.com</a></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Project Key</label>
+                            <input type="text" name="project" placeholder="e.g., KAN, SEC" required>
+                        </div>
+                        <button type="submit">Sync Findings</button>
+                    </form>
+                    <div class="loading" id="loading">Syncing findings...</div>
+                </div>
+                <script>
+                    document.getElementById('form').onsubmit = async (e) => {
+                        e.preventDefault();
+                        const form = e.target;
+                        const submit = form.querySelector('button');
+                        const error = document.getElementById('error');
+                        const success = document.getElementById('success');
+                        const loading = document.getElementById('loading');
+
+                        error.style.display = 'none';
+                        success.style.display = 'none';
+                        submit.style.display = 'none';
+                        loading.style.display = 'block';
+
+                        try {
+                            const params = new URLSearchParams(window.location.search);
+                            const runName = params.get('run');
+
+                            const response = await fetch('/api/jira/sync', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    instance_url: form.jira_url.value,
+                                    email: form.email.value,
+                                    api_token: form.token.value,
+                                    project_key: form.project.value,
+                                    finding_id: runName || 'all'
+                                })
+                            });
+
+                            if (!response.ok) {
+                                const data = await response.json();
+                                throw new Error(data.message || data.error || 'Sync failed');
+                            }
+
+                            success.textContent = 'Findings synced to Jira!';
+                            success.style.display = 'block';
+                            setTimeout(() => {
+                                window.history.back();
+                            }, 2000);
+                        } catch (err) {
+                            error.textContent = err.message;
+                            error.style.display = 'block';
+                            submit.style.display = 'block';
+                        } finally {
+                            loading.style.display = 'none';
+                        }
+                    };
+                </script>
+            </body>
+            </html>
+            """
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
 
         def _handle_jira_sync(self) -> None:
             body = self._read_body()
