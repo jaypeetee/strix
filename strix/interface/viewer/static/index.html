@@ -12,49 +12,96 @@
   <body>
     <div id="root"></div>
     <script>
-      // Intercept clicks to app.strix.ai and redirect to local /jira-sync
-      document.addEventListener('click', function(e) {
-        const target = e.target.closest('a');
-        if (target && target.href && target.href.includes('app.strix.ai')) {
+      // Intercept all navigation attempts to strix.ai
+      window.addEventListener('beforeunload', (e) => {
+        if (window.location.href.includes('strix.ai')) {
+          e.preventDefault();
+          return false;
+        }
+      });
+
+      // Override window.open to prevent popups to strix.ai
+      const originalOpen = window.open;
+      window.open = function(url, ...args) {
+        if (url && url.includes('strix.ai')) {
+          const runParam = new URLSearchParams(window.location.search).get('run');
+          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+          return null;
+        }
+        return originalOpen.apply(window, [url, ...args]);
+      };
+
+      // Intercept all click events to catch button clicks
+      let syncButtonIntercepted = false;
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (btn) {
+          const text = btn.textContent || '';
+
+          // Intercept Sync to Jira button
+          if (text.includes('Sync') && text.includes('Jira')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const runParam = new URLSearchParams(window.location.search).get('run');
+            window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+            return false;
+          }
+
+          // Intercept Email/PDF export button and redirect to export
+          if ((text.includes('Export') && text.includes('PDF')) || text.includes('EMail')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const runParam = new URLSearchParams(window.location.search).get('run');
+            window.location.href = '/?export=1' + (runParam ? '&run=' + runParam : '');
+            return false;
+          }
+        }
+
+        // Intercept any link to strix.ai
+        const link = e.target.closest('a');
+        if (link && link.href && link.href.includes('strix.ai')) {
           e.preventDefault();
           e.stopPropagation();
           const runParam = new URLSearchParams(window.location.search).get('run');
           window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+          return false;
         }
       }, true);
 
-      // Hide the old email export view and show a message
-      const hideEmailExportView = () => {
-        const emailExportElements = document.querySelectorAll('[class*="EmailReportView"], [class*="PDF"], [class*="password"]');
-        emailExportElements.forEach(el => {
-          if (el.textContent && (el.textContent.includes('EMail') || el.textContent.includes('PDF') || el.textContent.includes('password'))) {
-            el.style.display = 'none';
+      // Hide email export sections and replace with note
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root) {
+          const text = root.textContent || '';
+          if (text.includes('EMail') || text.includes('PDF') || text.includes('Sent to')) {
+            // Hide all content and show message
+            root.style.opacity = '0.5';
+            root.style.pointerEvents = 'none';
+
+            const msg = document.createElement('div');
+            msg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a1a;padding:40px;border-radius:8px;border:1px solid #333;color:#fff;text-align:center;z-index:10000;max-width:500px';
+            msg.innerHTML = '<h2>Email export is disabled</h2><p>Use the Export button to download your report as Markdown locally.</p><button onclick="location.href=\'/?\'">Back to Results</button>';
+            document.body.appendChild(msg);
           }
-        });
+        }
+      }, 500);
 
-        // Also hide by looking for text content
-        const allElements = document.querySelectorAll('*');
-        allElements.forEach(el => {
-          if (el.textContent && el.textContent.includes('Sent to') && el.textContent.includes('@')) {
-            el.closest('[class*="View"], [class*="Card"], [class*="Container"]')?.style.display = 'none';
-          }
-        });
-      };
-
-      // Run on load and watch for changes
-      hideEmailExportView();
-      const observer = new MutationObserver(hideEmailExportView);
-      observer.observe(document.body, { childList: true, subtree: true });
-
-      // Rename email/PDF button to markdown export
-      const observer = new MutationObserver(() => {
+      // Rename buttons
+      const renameButtons = () => {
         document.querySelectorAll('button').forEach(btn => {
-          if ((btn.textContent.includes('EMail') || btn.textContent.includes('PDF')) && !btn.dataset.renamed) {
+          const text = btn.textContent;
+          if (text.includes('Export') && text.includes('PDF') && !btn.dataset.renamed) {
             btn.textContent = 'Export report to .md';
             btn.dataset.renamed = 'true';
           }
+          if (text.includes('Sync') && text.includes('Jira') && !btn.dataset.renamed) {
+            btn.textContent = 'Sync to Jira';
+            btn.dataset.renamed = 'true';
+          }
         });
-      });
+      };
+      renameButtons();
+      const observer = new MutationObserver(renameButtons);
       observer.observe(document.body, { childList: true, subtree: true });
     </script>
   </body>
