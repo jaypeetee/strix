@@ -59,6 +59,7 @@ from strix.tools.todo.tools import (
     update_todo,
 )
 from strix.tools.web_search.tool import web_search
+from strix.tools.bounty.tool import bounty_query, bounty_list_domains
 
 
 if TYPE_CHECKING:
@@ -413,6 +414,8 @@ _BASE_TOOLS: tuple[Tool, ...] = (
     update_note,
     delete_note,
     web_search,
+    bounty_query,
+    bounty_list_domains,
     create_vulnerability_report,
     create_dependency_report,
     list_reports,
