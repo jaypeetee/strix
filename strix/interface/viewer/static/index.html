@@ -12,99 +12,95 @@
   <body>
     <div id="root"></div>
     <script>
-      console.log('[Strix] Loading interception scripts');
+      // Block all navigation to strix.ai at the earliest point
+      const originalReplace = History.prototype.replaceState;
+      const originalPush = History.prototype.pushState;
 
-      // Intercept all navigation to strix.ai
-      const originalAssign = window.location.assign;
-      const originalReplace = window.location.replace;
-
-      window.location.assign = function(url) {
-        console.log('[Strix] location.assign called with:', url);
-        if (typeof url === 'string' && url.includes('strix.ai')) {
-          console.log('[Strix] Blocking redirect to strix.ai, going to /jira-sync instead');
-          const runParam = new URLSearchParams(window.location.search).get('run');
-          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
-          return;
-        }
-        return originalAssign.apply(window.location, [url]);
+      History.prototype.replaceState = function(...args) {
+        if (args[2] && String(args[2]).includes('strix.ai')) return;
+        return originalReplace.apply(this, args);
       };
 
-      window.location.replace = function(url) {
-        console.log('[Strix] location.replace called with:', url);
-        if (typeof url === 'string' && url.includes('strix.ai')) {
-          console.log('[Strix] Blocking redirect to strix.ai, going to /jira-sync instead');
-          const runParam = new URLSearchParams(window.location.search).get('run');
-          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
-          return;
-        }
-        return originalReplace.apply(window.location, [url]);
+      History.prototype.pushState = function(...args) {
+        if (args[2] && String(args[2]).includes('strix.ai')) return;
+        return originalPush.apply(this, args);
       };
 
-      // Intercept fetch calls before React attaches handlers
-      const originalFetch = window.fetch;
-      window.fetch = function(...args) {
-        const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : '');
-        console.log('[Strix] fetch called:', url);
-
-        // Intercept Jira sync requests
-        if (url.includes('/api/jira/sync')) {
-          console.log('[Strix] Intercepting jira sync, redirecting to form');
-          const runParam = new URLSearchParams(window.location.search).get('run');
-          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
-          return Promise.reject(new Error('redirecting'));
-        }
-
-        // Block email report send and redirect
-        if (url.includes('/api/report/send')) {
-          console.log('[Strix] Intercepting report send');
-          const runParam = new URLSearchParams(window.location.search).get('run');
-          window.location.href = '/?tab=forecast' + (runParam ? '&run=' + runParam : '');
-          return Promise.reject(new Error('redirecting'));
-        }
-
-        return originalFetch.apply(this, args);
-      };
-
-      // Also intercept XMLHttpRequest
-      const originalXHROpen = XMLHttpRequest.prototype.open;
-      XMLHttpRequest.prototype.open = function(method, url, ...args) {
-        if (url.includes('/api/jira/sync') || url.includes('/api/report/send')) {
-          throw new Error('request blocked');
-        }
-        return originalXHROpen.apply(this, [method, url, ...args]);
-      };
-
-      // Watch for any element that might be a link to strix.ai
-      document.addEventListener('click', (e) => {
-        const target = e.target.closest('a[href*="strix.ai"], button');
-        if (target) {
-          console.log('[Strix] Click detected on:', target.tagName, target.href || target.textContent);
-        }
-      }, true);
-
-      // Hide email export and replace with message
-      setTimeout(() => {
-        const observer = new MutationObserver(() => {
-          const text = document.body.innerText;
-          if (text.includes('EMail') && text.includes('PDF')) {
-            const root = document.getElementById('root');
-            if (root && !root.dataset.replacedEmailView) {
-              root.dataset.replacedEmailView = 'true';
-              root.innerHTML = `
-                <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;">
-                  <div style="text-align: center; padding: 40px;">
-                    <h1 style="margin: 0 0 20px 0;">Email Export Disabled</h1>
-                    <p style="margin: 0 0 30px 0; color: #aaa;">This feature is no longer available.</p>
-                    <p style="margin: 0 0 30px 0; color: #aaa;">Use the <strong>Export report to .md</strong> button to download your report as markdown instead.</p>
-                    <button onclick="window.history.back()" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">← Back to Results</button>
-                  </div>
-                </div>
-              `;
-            }
+      // Intercept window.location changes
+      let inNavigation = false;
+      const navHandler = {
+        get(target, prop) {
+          if (prop === 'href') {
+            return target.href;
           }
+          if (prop === 'assign' || prop === 'replace') {
+            return function(url) {
+              if (String(url).includes('strix.ai')) {
+                const runParam = new URLSearchParams(window.location.search).get('run');
+                target.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+                return;
+              }
+              return target[prop](url);
+            };
+          }
+          return Reflect.get(target, prop);
+        },
+        set(target, prop, value) {
+          if (prop === 'href' && String(value).includes('strix.ai')) {
+            const runParam = new URLSearchParams(window.location.search).get('run');
+            return Reflect.set(target, prop, '/jira-sync' + (runParam ? '?run=' + runParam : ''));
+          }
+          return Reflect.set(target, prop, value);
+        }
+      };
+
+      try {
+        Object.defineProperty(window, 'location', {
+          get: () => new Proxy(window.location, navHandler),
+          configurable: true
         });
-        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-      }, 500);
+      } catch (e) {
+        console.log('Could not proxy location');
+      }
+
+      // Wait for React to render, then hide email export and add custom buttons
+      setTimeout(() => {
+        // Hide the email export card by finding it
+        const hideEmailCard = () => {
+          document.querySelectorAll('*').forEach(el => {
+            if (el.textContent && el.textContent.includes('EMail') && el.textContent.includes('encrypted PDF')) {
+              const card = el.closest('[class*="Card"], [class*="View"], div');
+              if (card) card.style.display = 'none';
+            }
+          });
+        };
+
+        hideEmailCard();
+        const observer = new MutationObserver(hideEmailCard);
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Add custom action buttons at the top
+        const topSection = document.querySelector('[class*="Header"], [class*="Top"], header') ||
+                          document.querySelector('div[class*="Container"]');
+
+        if (!document.getElementById('custom-actions')) {
+          const actionsDiv = document.createElement('div');
+          actionsDiv.id = 'custom-actions';
+          actionsDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            gap: 8px;
+          `;
+          actionsDiv.innerHTML = `
+            <button onclick="fetch('/api/report/markdown').then(r=>r.json()).then(d=>{const b=new Blob([d.markdown],{type:'text/markdown'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=d.filename||'strix-report.md';a.click();URL.revokeObjectURL(u)}).catch(e=>alert('Export failed: '+e.message))" style="padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">Export .md</button>
+            <button onclick="const run=new URLSearchParams(window.location.search).get('run');window.location='/jira-sync'+(run?'?run='+run:'')" style="padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">Sync to Jira</button>
+          `;
+          document.body.appendChild(actionsDiv);
+        }
+      }, 1000);
     </script>
   </body>
 </html>
