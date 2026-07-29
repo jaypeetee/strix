@@ -79,27 +79,58 @@
         const observer = new MutationObserver(hideEmailCard);
         observer.observe(document.body, { childList: true, subtree: true });
 
-        // Add custom action buttons at the top
-        const topSection = document.querySelector('[class*="Header"], [class*="Top"], header') ||
-                          document.querySelector('div[class*="Container"]');
-
-        if (!document.getElementById('custom-actions')) {
-          const actionsDiv = document.createElement('div');
-          actionsDiv.id = 'custom-actions';
-          actionsDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            display: flex;
-            gap: 8px;
-          `;
-          actionsDiv.innerHTML = `
-            <button onclick="fetch('/api/report/markdown').then(r=>r.json()).then(d=>{const b=new Blob([d.markdown],{type:'text/markdown'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=d.filename||'strix-report.md';a.click();URL.revokeObjectURL(u)}).catch(e=>alert('Export failed: '+e.message))" style="padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">Export .md</button>
-            <button onclick="const run=new URLSearchParams(window.location.search).get('run');window.location='/jira-sync'+(run?'?run='+run:'')" style="padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;">Sync to Jira</button>
-          `;
-          document.body.appendChild(actionsDiv);
+        // Define action functions
+      window.exportMarkdown = async function() {
+        try {
+          const res = await fetch('/api/report/markdown');
+          const data = await res.json();
+          if (data.markdown) {
+            const blob = new Blob([data.markdown], {type: 'text/markdown'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename || 'strix-report.md';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }
+        } catch (e) {
+          alert('Export failed: ' + e.message);
         }
+      };
+
+      window.syncToJira = function() {
+        const run = new URLSearchParams(window.location.search).get('run');
+        window.location.href = '/jira-sync' + (run ? '?run=' + run : '');
+      };
+
+      // Add custom action buttons at the top
+      if (!document.getElementById('custom-actions')) {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.id = 'custom-actions';
+        actionsDiv.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 10000;
+          display: flex;
+          gap: 8px;
+        `;
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = 'Export .md';
+        exportBtn.style.cssText = 'padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+        exportBtn.onclick = window.exportMarkdown;
+
+        const jiraBtn = document.createElement('button');
+        jiraBtn.textContent = 'Sync to Jira';
+        jiraBtn.style.cssText = 'padding:8px 16px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+        jiraBtn.onclick = window.syncToJira;
+
+        actionsDiv.appendChild(exportBtn);
+        actionsDiv.appendChild(jiraBtn);
+        document.body.appendChild(actionsDiv);
+      }
       }, 1000);
     </script>
   </body>
