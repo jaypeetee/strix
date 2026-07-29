@@ -260,6 +260,17 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._handle_jira_sync_form()
                 return
 
+            # Redirect old strix.ai links to local Jira sync form
+            if path.startswith("/integrations") or path == "/autofix":
+                self.send_response(HTTPStatus.FOUND)
+                run_param = query.get("run", [""])[0]
+                redirect_url = "/jira-sync"
+                if run_param:
+                    redirect_url += f"?run={run_param}"
+                self.send_header("Location", redirect_url)
+                self.end_headers()
+                return
+
             run_values = query.get("run")
             run_param = run_values[0] if run_values else None
             run_dir = resolve_run_dir(state.base_dir, run_param, state.run_dir)
