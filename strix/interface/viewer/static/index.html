@@ -11,5 +11,27 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Intercept clicks to app.strix.ai and redirect to local /jira-sync
+      document.addEventListener('click', function(e) {
+        const target = e.target.closest('a');
+        if (target && target.href && target.href.includes('app.strix.ai')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const runParam = new URLSearchParams(window.location.search).get('run');
+          window.location.href = '/jira-sync' + (runParam ? '?run=' + runParam : '');
+        }
+      }, true);
+
+      // Rename email/PDF button to markdown export
+      const observer = new MutationObserver(() => {
+        document.querySelectorAll('button').forEach(btn => {
+          if (btn.textContent.includes('EMail') || btn.textContent.includes('PDF')) {
+            btn.textContent = 'Export report to .md';
+          }
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    </script>
   </body>
 </html>
