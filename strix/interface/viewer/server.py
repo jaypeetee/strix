@@ -28,6 +28,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urlsplit
 
 from strix.core.paths import run_record_path
 from strix.interface.viewer import auth
+from strix.interface.viewer.jira_sync import sync_finding_to_jira
 from strix.interface.viewer.transcript import (
     build_run_state,
     primary_target,
@@ -184,6 +185,8 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                     self._handle_feedback()
                 elif path == "/api/agents/steer":
                     self._handle_steer()
+                elif path == "/api/jira/sync":
+                    self._handle_jira_sync()
                 else:
                     self._send_json(HTTPStatus.NOT_FOUND, {"error": "unknown endpoint"})
             except BrokenPipeError:
@@ -451,6 +454,55 @@ def _make_handler(state: _ViewerState) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.OK, {"ok": True})
             else:
                 self._send_json(HTTPStatus.OK, {"ok": False, "error": "not_delivered"})
+
+        def _handle_jira_sync(self) -> None:
+            body = self._read_body()
+            instance_url = body.get("instance_url", "").strip()
+            api_token = body.get("api_token", "").strip()
+            email = body.get("email", "").strip()
+            project_key = body.get("project_key", "").strip()
+            finding_id = body.get("finding_id")
+
+            # Validate inputs
+            if not all([instance_url, api_token, email, project_key, finding_id]):
+                self._send_json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "missing_required_fields"},
+                )
+                return
+
+            # Get the finding from the current run
+            run_dir = state.default_run_dir
+            if not run_dir:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "no_run_loaded"})
+                return
+
+            vulns = read_vulnerabilities(run_dir)
+            finding = None
+            for vuln in vulns:
+                if vuln.get("id") == finding_id:
+                    finding = vuln
+                    break
+
+            if not finding:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "finding_not_found"})
+                return
+
+            try:
+                result = sync_finding_to_jira(
+                    instance_url=instance_url,
+                    api_token=api_token,
+                    email=email,
+                    project_key=project_key,
+                    finding=finding,
+                )
+                self._send_json(HTTPStatus.OK, {"success": True, "issue": result})
+            except Exception as e:
+                logger.exception("Jira sync failed")
+                self._send_json(
+                    HTTPStatus.BAD_GATEWAY,
+                    {"error": "jira_sync_failed", "message": str(e)},
+                )
 
         def _send_relay_error(self, exc: auth.RelayError) -> None:
             status_by_code = {
