@@ -57,6 +57,7 @@ bedrock = ["boto3>=1.28.0"]
 
 [project.scripts]
 strix = "strix.interface.main:main"
+strix-jira-sync = "strix.interface.jira_cli:main"
 
 [dependency-groups]
 dev = [
