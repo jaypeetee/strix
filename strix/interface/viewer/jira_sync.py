@@ -84,7 +84,7 @@ def sync_finding_to_jira(
     project_key: str,
     finding: dict[str, Any],
 ) -> dict[str, Any]:
-    """Create a Jira issue from a Strix finding.
+    """Create a Jira issue from a Strix finding with all details.
 
     Args:
         instance_url: Jira instance URL
@@ -100,10 +100,38 @@ def sync_finding_to_jira(
 
     title = finding.get("title", "Security Finding")
     severity = finding.get("severity", "medium").upper()
-    description = (
-        f"Severity: {severity}\n\n"
-        f"{finding.get('description', 'No description provided')}"
-    )
+
+    # Build comprehensive description with all finding details
+    description_parts = [
+        f"Severity: {severity}",
+        f"CVSS Score: {finding.get('cvss', 'N/A')}",
+    ]
+
+    if finding.get('description'):
+        description_parts.append(f"\nDescription:\n{finding['description']}")
+
+    if finding.get('assumptions'):
+        description_parts.append(f"\nAssumptions:\n{finding['assumptions']}")
+
+    if finding.get('remediation_steps'):
+        description_parts.append(f"\nRemediation:\n{finding['remediation_steps']}")
+
+    if finding.get('evidence'):
+        description_parts.append(f"\nEvidence:\n{finding['evidence']}")
+
+    if finding.get('poc_description'):
+        description_parts.append(f"\nProof of Concept:\n{finding['poc_description']}")
+
+    if finding.get('code_locations') and isinstance(finding['code_locations'], list):
+        code_locs = finding['code_locations']
+        if code_locs:
+            description_parts.append("\nCode Locations:")
+            for loc in code_locs:
+                file = loc.get('file', 'unknown')
+                line = loc.get('start_line', '?')
+                description_parts.append(f"  - {file}:{line}")
+
+    description = "\n".join(description_parts)
 
     # Map severity to Jira priority
     priority_map = {
@@ -114,11 +142,16 @@ def sync_finding_to_jira(
     }
     priority = priority_map.get(severity, "Medium")
 
+    # Add CVE if available
+    labels = ["security", f"strix-{severity.lower()}"]
+    if finding.get('cve'):
+        labels.append(finding['cve'])
+
     return client.create_issue(
         project_key=project_key,
         title=title,
         description=description,
         issue_type="Task",
         priority=priority,
-        labels=["security", f"strix-{severity.lower()}"],
+        labels=labels,
     )
