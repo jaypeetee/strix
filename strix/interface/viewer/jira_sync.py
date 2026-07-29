@@ -101,7 +101,7 @@ def sync_finding_to_jira(
     title = finding.get("title", "Security Finding")
     severity = finding.get("severity", "medium").upper()
     description = (
-        f"*Severity:* {severity}\n\n"
+        f"Severity: {severity}\n\n"
         f"{finding.get('description', 'No description provided')}"
     )
 
@@ -118,7 +118,7 @@ def sync_finding_to_jira(
         project_key=project_key,
         title=title,
         description=description,
-        issue_type="Bug",
+        issue_type="Task",
         priority=priority,
         labels=["security", f"strix-{severity.lower()}"],
     )
